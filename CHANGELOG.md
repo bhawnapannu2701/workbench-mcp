@@ -20,6 +20,8 @@ Prepared:
 - Dockerfile, direct container smoke test, Compose smoke workflow, and GitHub Actions CI.
 - Public README, architecture docs, threat model, runbook, debugging notes, security policy,
   contributing guide, release checklist, engineering evidence, and reproducible demo.
+- Final audit hardening for bounded subprocess capture, bounded artifact collection,
+  read-only Git timeout/output limits, and external-diff suppression.
 
 Not included:
 

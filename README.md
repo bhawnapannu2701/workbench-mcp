@@ -25,7 +25,9 @@ Implemented and locally verified:
 - Docker image build, direct container smoke test, Compose config, and Compose smoke
   workflow.
 - Reproducible public demo that creates a temporary Git workspace and writes a JSON report.
-- GitHub Actions CI is green for commit `4efddd89c8aed22310f3dc14a74ed1e215ec21e1`.
+- GitHub Actions CI is green for the latest pushed Phase 7 commit
+  `34fc81ae32e4404f01f3f460b43e6508e108421d` in run `29778875177`.
+- Local final-audit fixes after that pushed commit require a new CI run after push.
 
 Not implemented:
 
@@ -290,10 +292,11 @@ docker compose run --rm --build workbench-mcp-smoke
 - Workspace paths are resolved with `pathlib` and must remain inside `WORKSPACE_ROOT`.
 - Artifact paths are resolved inside category directories under `ARTIFACT_DIRECTORY`.
 - Symlink escapes, parent traversal, absolute-path escapes, oversized files, binary text
-  reads, shell operators, executable paths, command timeouts, and output exhaustion are
-  covered by source checks and tests.
+  reads, shell operators, executable paths, command timeouts, bounded output capture, and
+  truncation are covered by source checks and tests.
 - Expected service errors are converted to sanitized MCP `ToolError` messages.
-- Git behavior is read-only and limited to status/diff inspection.
+- Git behavior is read-only, bounded by the configured command timeout/output limit, and
+  disables external diff execution for diff-stat inspection.
 - Docker smoke workflows use a non-root runtime user and avoid privileged mounts.
 
 This is not a complete arbitrary-code execution sandbox. Allowlisting a powerful executable

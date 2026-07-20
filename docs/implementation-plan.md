@@ -42,7 +42,7 @@ scripts/
 artifacts/
 ```
 
-Phase 1 established the package metadata, repository rules, validated configuration layer, and configuration tests. Phases 2 and 3 added the secure service layer. Phase 4 added FastMCP tool/resource registration and stdio startup. Phase 5 completed broad security and integration validation. Phase 6 added Docker packaging and CI configuration. Phase 7 adds public documentation, a reproducible demo, and release-preparation evidence. Phase 8 is reserved for the independent final audit.
+Phase 1 established the package metadata, repository rules, validated configuration layer, and configuration tests. Phases 2 and 3 added the secure service layer. Phase 4 added FastMCP tool/resource registration and stdio startup. Phase 5 completed broad security and integration validation. Phase 6 added Docker packaging and CI configuration. Phase 7 adds public documentation, a reproducible demo, and release-preparation evidence. Phase 8 is the independent final audit.
 
 ## Security Boundaries
 
@@ -90,8 +90,9 @@ Phase 1 established the package metadata, repository rules, validated configurat
 - Phase 7: public README, architecture docs, threat model, runbook, debugging notes,
   security policy, contributing guide, changelog, release checklist, project evidence, and
   reproducible demo are prepared. Remote GitHub Actions is green for commit
-  `4efddd89c8aed22310f3dc14a74ed1e215ec21e1`.
-- Phase 8 remains the independent final audit and has not started.
+  `34fc81ae32e4404f01f3f460b43e6508e108421d`.
+- Phase 8 final audit found and fixed bounded-output, artifact-read, Git hardening, and
+  stale-CI documentation defects. Local verification is recorded in `PROJECT_EVIDENCE.md`.
 
 ## Testing Strategy
 

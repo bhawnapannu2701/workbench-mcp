@@ -1,9 +1,8 @@
 # Project Evidence
 
-This file records actual evidence for `workbench-mcp` Phase 7. It does not claim HTTP
-support, production deployment, package publishing, Docker image publishing, private
-platform integration, Git tags, GitHub releases, or completion of the independent final
-audit.
+This file records actual evidence for `workbench-mcp` Phase 7 and the final pre-release
+audit. It does not claim HTTP support, production deployment, package publishing, Docker
+image publishing, private platform integration, Git tags, or GitHub releases.
 
 ## Runtime
 
@@ -13,8 +12,8 @@ audit.
 - Local FastMCP import: `3.4.4`
 - Docker: `Docker version 28.3.3, build 980b856`
 - Docker Compose: `Docker Compose version v2.39.2-desktop.1`
-- Docker engine after recovery: `28.3.3 linux x86_64`
-- Local branch at start of Phase 7: `codex/workbench-mcp-v1`
+- Docker engine: `28.3.3 linux x86_64`
+- Audit branch: `codex/workbench-mcp-v1`
 - Upstream branch: `origin/codex/workbench-mcp-v1`
 
 ## MCP Surface
@@ -47,13 +46,27 @@ Not implemented:
 - HTTP and Streamable HTTP. This project has no validated HTTP configuration, host/port
   policy, authentication policy, or HTTP smoke verification.
 
+## Final Audit Findings Fixed
+
+- Subprocess output was previously truncated only after `communicate()` captured full
+  stdout/stderr. Added bounded concurrent pipe readers in
+  `src/workbench_mcp/services/subprocess_capture.py`.
+- Artifact collection previously read whole artifact files before truncation. It now reads
+  a bounded prefix plus a fixed binary-detection sample.
+- Git inspection previously used unbounded `subprocess.run()` and `git diff --shortstat`
+  without `--no-ext-diff`. It now uses bounded subprocess execution, timeout/output
+  limits, disabled prompts/global/system config/optional locks, and `--no-ext-diff`.
+- Diagnostics now reports Git inspection failures as warnings.
+- Stale documentation references to the previous Phase 7 CI run were corrected.
+
 ## Source And Test Mapping
 
 | Behavior | Source | Tests/evidence |
 | --- | --- | --- |
 | Configuration loading and validation | `src/workbench_mcp/config.py` | `tests/unit/test_config.py` |
 | Workspace path containment | `src/workbench_mcp/security/paths.py` | `tests/security/test_path_security.py` |
-| File size, binary detection, output truncation | `src/workbench_mcp/security/limits.py` | `tests/unit/test_filesystem_services.py`, `tests/unit/test_search_service.py`, `tests/unit/test_process_runner.py` |
+| File size, binary detection, truncation | `src/workbench_mcp/security/limits.py` | `tests/unit/test_filesystem_services.py`, `tests/unit/test_search_service.py` |
+| Bounded subprocess capture | `src/workbench_mcp/services/subprocess_capture.py` | `tests/unit/test_process_runner.py`, `tests/unit/test_git_service.py` |
 | Command validation | `src/workbench_mcp/security/commands.py` | `tests/unit/test_config.py`, `tests/unit/test_process_runner.py` |
 | Redaction | `src/workbench_mcp/security/redaction.py`, `src/workbench_mcp/tools/common.py` | `tests/unit/test_process_runner.py`, `tests/unit/test_mcp_server.py` |
 | Filesystem listing and reads | `src/workbench_mcp/services/filesystem.py` | `tests/unit/test_filesystem_services.py` |
@@ -68,41 +81,35 @@ Not implemented:
 | Public demo | `scripts/run-demo.py` | `tests/e2e/test_public_demo.py`, `uv run python scripts/run-demo.py` |
 | Container smoke | `scripts/container-smoke-test.py`, `scripts/run-container-smoke.py`, `Dockerfile`, `compose.yaml` | `tests/unit/test_run_container_smoke.py`, direct container smoke, Compose smoke |
 
-## Local Verification Commands
+## Commands Run In Final Audit
 
-Because bare `uv` is not on PATH in this Windows shell, local verification used
-`$env:APPDATA\Python\Python313\Scripts\uv.exe`.
-
-Commands actually run:
+Bare `uv` is not on PATH in this Windows PowerShell session; the exact requested
+`uv sync --frozen` command failed with `uv : The term 'uv' is not recognized`. Actual uv
+verification used `$env:APPDATA\Python\Python313\Scripts\uv.exe`.
 
 ```powershell
 git branch --show-current
 git status --short
-git log --oneline -8
+git log --oneline -12
 git stash list
 git remote -v
-git branch -vv
-git rev-parse --abbrev-ref --symbolic-full-name '@{u}'
-git rev-parse '4efddd8^{commit}'
-git ls-remote --heads origin codex/workbench-mcp-v1
-gh run view 29775378084 --json databaseId,headSha,status,conclusion,createdAt,updatedAt,event,url,jobs
-& $env:APPDATA\Python\Python313\Scripts\uv.exe sync --frozen --all-groups
-& $env:APPDATA\Python\Python313\Scripts\uv.exe lock --check
-& $env:APPDATA\Python\Python313\Scripts\uv.exe --version
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run python --version
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run python -c "import fastmcp, workbench_mcp; print(workbench_mcp.__version__); print(fastmcp.__version__)"
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run workbench-mcp --version
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run python -m workbench_mcp.server --version
+git fetch origin +refs/heads/codex/workbench-mcp-v1:refs/remotes/origin/codex/workbench-mcp-v1
+git rev-parse HEAD
+git rev-parse origin/codex/workbench-mcp-v1
+git rev-list --left-right --count HEAD...origin/codex/workbench-mcp-v1
+gh run list --branch codex/workbench-mcp-v1 --limit 10 --json databaseId,headSha,status,conclusion,createdAt,updatedAt,event,url,displayTitle
+gh run view 29778875177 --json databaseId,headSha,status,conclusion,createdAt,updatedAt,event,url,jobs
+uv sync --frozen
+& $env:APPDATA\Python\Python313\Scripts\uv.exe sync --frozen
 & $env:APPDATA\Python\Python313\Scripts\uv.exe run ruff format --check .
 & $env:APPDATA\Python\Python313\Scripts\uv.exe run ruff check .
 & $env:APPDATA\Python\Python313\Scripts\uv.exe run mypy src
 & $env:APPDATA\Python\Python313\Scripts\uv.exe run pytest -rs
 & $env:APPDATA\Python\Python313\Scripts\uv.exe run pytest --cov=workbench_mcp --cov-report=term-missing
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run coverage json -o artifacts\coverage\coverage.json
-& $env:APPDATA\Python\Python313\Scripts\uv.exe build
 & $env:APPDATA\Python\Python313\Scripts\uv.exe run pytest tests\unit\test_mcp_server.py::test_server_startup_succeeds -q
 & $env:APPDATA\Python\Python313\Scripts\uv.exe run pytest tests\e2e\test_mcp_stdio.py -q
 & $env:APPDATA\Python\Python313\Scripts\uv.exe run python scripts\run-demo.py
+& $env:APPDATA\Python\Python313\Scripts\uv.exe build
 docker --version
 docker compose version
 docker info --format '{{.ServerVersion}} {{.OSType}} {{.Architecture}}'
@@ -111,28 +118,21 @@ docker image inspect workbench-mcp:local --format '{{.Id}} {{.Config.User}} {{js
 docker run --rm --entrypoint python workbench-mcp:local -c "import os; print(os.geteuid())"
 docker run --rm --entrypoint python workbench-mcp:local -c "import workbench_mcp, fastmcp; print(workbench_mcp.__version__); print(fastmcp.__version__)"
 & $env:APPDATA\Python\Python313\Scripts\uv.exe run python scripts\run-container-smoke.py --image workbench-mcp:local
-New-Item -ItemType Directory -Force .workbench-demo\workspace, .workbench-demo\artifacts | Out-Null
+New-Item -ItemType Directory -Force .workbench-demo\workspace, .workbench-demo\artifacts
 Set-Content -LiteralPath .workbench-demo\workspace\smoke.txt -Value "hello compose"
 docker compose config
 docker compose run --rm --build workbench-mcp-smoke
-rg -n -S "TODO|FIXME|placeholder|mocked success|unsupported HTTP references|unsupported HTTP|Mercor|RL Studio|production deployment|hardcoded secrets" .
-rg -n -S "password|token|api[_-]?key|secret|PRIVATE KEY|BEGIN .* KEY|gho_|github_pat|sk-[A-Za-z0-9]" .
 ```
 
 ## Quality Results
 
-- Dependency sync: `Checked 84 packages in 19ms`
-- Lockfile check: `Resolved 86 packages in 3ms`
-- Ruff format: `48 files already formatted`
+- Dependency sync: `Checked 84 packages in 8ms`
+- Ruff format: `49 files already formatted`
 - Ruff lint: `All checks passed!`
-- mypy: `Success: no issues found in 28 source files`
-- Full pytest suite: `93 items collected`, `89 passed, 4 skipped in 15.75s`
-- Coverage command: `89 passed, 4 skipped in 17.03s`
-- Coverage display: `84%`
-- Covered statements/lines: `1076/1254`
-- Statement coverage: `85.8054226475279%` (`86` display)
-- Covered branches: `202/274`
-- Branch coverage: `73.72262773722628%` (`74` display)
+- mypy: `Success: no issues found in 29 source files`
+- Full pytest suite: `98 items collected`, `94 passed, 4 skipped in 11.29s`
+- Coverage command: `94 passed, 4 skipped in 24.05s`
+- Coverage display: `83%`
 - Package build: succeeded
 - Built artifacts:
   - `dist\workbench_mcp-0.1.0.tar.gz`
@@ -148,22 +148,15 @@ with `WinError 1314`.
 - `tests/security/test_path_security.py::test_read_file_rejects_symlink_escape`
 - `tests/security/test_path_security.py::test_list_files_rejects_symlink_directory_escape`
 
-The tests remain active where symlink creation is available.
-
-## Linux Symlink Test Result
-
-Remote GitHub Actions run `29775378084` completed the step
-`Run symlink security tests explicitly on Linux` successfully for commit
-`4efddd89c8aed22310f3dc14a74ed1e215ec21e1`.
+The tests remain active where symlink creation is available. Remote Linux CI run
+`29778875177` completed the explicit symlink security test step successfully.
 
 ## MCP Results
 
-- Construction smoke command:
-  `uv run pytest tests\unit\test_mcp_server.py::test_server_startup_succeeds -q`
-- Construction smoke result: `1 passed in 6.65s`
-- Real stdio MCP client/server command:
-  `uv run pytest tests\e2e\test_mcp_stdio.py -q`
-- Real stdio MCP client/server result after serial rerun: `1 passed in 4.07s`
+- Construction smoke:
+  `1 passed in 2.59s`
+- Real stdio MCP client/server:
+  `1 passed in 3.56s`
 - The stdio E2E test starts `python -m workbench_mcp.server` through FastMCP
   `StdioTransport`, lists tools, and reads a workspace file through a real MCP
   client/server interaction.
@@ -178,21 +171,15 @@ Remote GitHub Actions run `29775378084` completed the step
 - Controlled patch: `docs/guide.txt changed=True`
 - Expected blocked operation: `read_file {'relative_path': '../outside.txt'}`
 - Cleanup: temporary demo workspace removed.
+- Report audit: no demo temp prefix, repository root, or common secret markers found.
 
 ## Docker Evidence
-
-Docker Desktop initially became unhealthy during Phase 7 verification. The first Docker
-build attempt hit the local command timeout, and Docker then returned API 500 errors until
-the Docker Desktop/WSL engine was restarted. This environment failure and recovery are
-documented in `docs/debugging.md` and `docs/failure-catalog.md`.
-
-After recovery:
 
 - Docker engine probe: `28.3.3 linux x86_64`
 - Docker build command: `docker build --progress=plain -t workbench-mcp:local .`
 - Docker build result: succeeded
 - Final local image ID after Compose rebuild:
-  `sha256:4182951e671d2f982b96afaf112535fdf41b6ec1d4d6550e5ec12335d8254d6d`
+  `sha256:9c98166db5cfe4675160a3a0fdbe6ae1c41eca49f893ad2155d526d845ecb5a7`
 - Runtime user from image config: `10001:10001`
 - Runtime entry point: `["workbench-mcp"]`
 - Runtime command: `["--transport","stdio"]`
@@ -204,21 +191,23 @@ After recovery:
 - Container smoke verified expected tools, `workbench://server-info`, non-root execution,
   workspace read access, read-only patch blocking, diagnostic artifact collection, artifact
   escape blocking, and workspace path escape blocking.
-- Compose config result: passed
-- Compose smoke result: JSON status `ok`
+- Compose config result: passed; no ports, no network, read-only root filesystem, dropped
+  capabilities, `no-new-privileges:true`, and no Docker socket mount.
+- Compose smoke result: JSON status `ok`.
+- Host artifact probe after Compose smoke was writable and removable by the host.
 
 ## Remote CI Evidence
 
 - Workflow: `.github/workflows/ci.yml`
-- Run ID: `29775378084`
-- Run URL: `https://github.com/bhawnapannu2701/workbench-mcp/actions/runs/29775378084`
+- Run ID: `29778875177`
+- Run URL: `https://github.com/bhawnapannu2701/workbench-mcp/actions/runs/29778875177`
 - Branch: `codex/workbench-mcp-v1`
 - Event: `push`
-- Head SHA: `4efddd89c8aed22310f3dc14a74ed1e215ec21e1`
+- Head SHA: `34fc81ae32e4404f01f3f460b43e6508e108421d`
 - Status: `completed`
 - Conclusion: `success`
-- Created: `2026-07-20T20:15:36Z`
-- Updated: `2026-07-20T20:16:47Z`
+- Created: `2026-07-20T21:06:37Z`
+- Updated: `2026-07-20T21:07:45Z`
 - Job: `Verify package, security tests, and containers`
 - Job conclusion: `success`
 
@@ -226,6 +215,9 @@ Successful remote steps included locked dependency installation, lockfile check,
 format/lint, mypy, tests with coverage, explicit Linux symlink security tests, package
 build, MCP stdio smoke, Docker image build, container smoke, Compose config, and Compose
 smoke workflow.
+
+Local final-audit fixes in this working tree are newer than that pushed CI run and require
+a new CI run after push.
 
 ## Documentation And Search Audit
 
@@ -247,7 +239,7 @@ Search hits were reviewed. Remaining hits are repository rules, explicit non-cla
 security documentation, test fixtures, dependency package names such as `secretstorage`, or
 implemented redaction/configuration terms. No real secret, Mercor/RL Studio compatibility
 claim, HTTP instruction, production deployment claim, fake success statement, or registered
-tool documentation gap was found after the Phase 7 documentation update.
+tool documentation gap was found after the final audit documentation update.
 
 ## Known Limitations
 
@@ -259,8 +251,8 @@ tool documentation gap was found after the Phase 7 documentation update.
 - Artifact collection is limited to approved text categories and suffixes.
 - Docker and Compose workflows verify local packaging/runtime behavior but do not publish
   images or deploy a production service.
-- Remote CI evidence currently applies to commit `4efddd89c8aed22310f3dc14a74ed1e215ec21e1`;
-  Phase 7 documentation/demo changes are verified locally before commit.
+- Remote CI evidence applies to the latest pushed Phase 7 commit. Local final-audit fixes
+  need a fresh CI run after push.
 
 ## Claims That Must Not Be Made
 
@@ -270,4 +262,3 @@ tool documentation gap was found after the Phase 7 documentation update.
 - Do not claim a Git tag or GitHub release exists.
 - Do not claim integration or compatibility with Mercor, RL Studio, or any private platform.
 - Do not claim this is a complete arbitrary-code execution sandbox.
-- Do not claim the independent final audit has started or completed.

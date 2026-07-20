@@ -11,6 +11,8 @@ from workbench_mcp.security.limits import truncate_text
 from workbench_mcp.security.paths import SafePath, resolve_contained_path
 from workbench_mcp.security.redaction import Redactor
 
+ARTIFACT_BINARY_SAMPLE_BYTES = 4096
+
 APPROVED_ARTIFACT_CATEGORIES: dict[str, tuple[str, frozenset[str]]] = {
     "test_report": ("test-reports", frozenset({".json", ".xml", ".txt", ".log"})),
     "coverage_report": ("coverage", frozenset({".json", ".xml", ".html", ".txt"})),
@@ -53,18 +55,21 @@ class ArtifactService:
             msg = f"artifact path is not a file: {relative_path}"
             raise ArtifactAccessError(msg)
 
-        content_bytes = safe_path.resolved.read_bytes()
-        if b"\x00" in content_bytes[:4096]:
+        size_bytes, content_bytes, binary_sample, read_truncated = _read_bounded_artifact_bytes(
+            safe_path.resolved,
+            self._config.max_output_bytes,
+        )
+        if b"\x00" in binary_sample:
             msg = "artifact appears to be binary and cannot be collected as text"
             raise ArtifactAccessError(msg)
         content = self._redactor.redact(content_bytes.decode("utf-8", errors="replace"))
-        content, truncated = truncate_text(content, self._config.max_output_bytes)
+        content, output_truncated = truncate_text(content, self._config.max_output_bytes)
         return Artifact(
             category=category,
             path=f"{category_directory}/{safe_path.display_path}",
-            size_bytes=len(content_bytes),
+            size_bytes=size_bytes,
             content=content,
-            truncated=truncated,
+            truncated=read_truncated or output_truncated,
         )
 
 
@@ -74,3 +79,19 @@ def _resolve_existing_artifact(category_root: Path, relative_path: str | Path) -
     except PathSecurityError as exc:
         msg = f"artifact path is not approved: {relative_path}"
         raise ArtifactAccessError(msg) from exc
+
+
+def _read_bounded_artifact_bytes(
+    path: Path,
+    max_output_bytes: int,
+) -> tuple[int, bytes, bytes, bool]:
+    size_bytes = path.stat().st_size
+    read_limit = max(max_output_bytes + 1, ARTIFACT_BINARY_SAMPLE_BYTES)
+    with path.open("rb") as artifact_file:
+        sampled_bytes = artifact_file.read(read_limit)
+    return (
+        size_bytes,
+        sampled_bytes[:max_output_bytes],
+        sampled_bytes[:ARTIFACT_BINARY_SAMPLE_BYTES],
+        size_bytes > max_output_bytes,
+    )

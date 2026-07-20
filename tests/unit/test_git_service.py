@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
 
 import pytest
 from tests.helpers import make_config
 
+from workbench_mcp.errors import GitServiceError
 from workbench_mcp.services.git_service import GitService
+from workbench_mcp.services.subprocess_capture import CapturedProcessBytes
 
 
 def test_git_status_reports_repository_changes(tmp_path: Path) -> None:
@@ -68,27 +70,49 @@ def test_git_status_uses_only_read_only_git_commands(
     def fake_which(executable: str) -> str | None:
         return "git" if executable == "git" else None
 
-    def fake_run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        captured_commands.append(tuple(command[1:]))
-        assert kwargs["cwd"] == workspace
-        assert kwargs["shell"] is False
-        git_args = tuple(command[1:])
+    def fake_run_bounded_subprocess(
+        command: Sequence[str],
+        *,
+        cwd: Path,
+        timeout_seconds: int,
+        max_output_bytes: int,
+        env: Mapping[str, str] | None = None,
+        start_error_message: str,
+    ) -> CapturedProcessBytes:
+        assert cwd == workspace
+        assert timeout_seconds > 0
+        assert max_output_bytes > 0
+        assert start_error_message.startswith("failed to start git")
+        assert "--no-pager" in command
+        assert "core.fsmonitor=false" in command
+        assert "diff.external=" in command
+        assert env is not None
+        assert env["GIT_OPTIONAL_LOCKS"] == "0"
+        assert env["GIT_TERMINAL_PROMPT"] == "0"
+        git_args = _git_subcommand_args(command)
+        captured_commands.append(git_args)
         stdout_by_args = {
             ("rev-parse", "--is-inside-work-tree"): "true\n",
             ("branch", "--show-current"): "main\n",
             ("status", "--porcelain=v1"): " M README.md\n?? new.txt\n",
-            ("diff", "--shortstat"): " 1 file changed, 1 insertion(+)\n",
-            ("diff", "--cached", "--shortstat"): "",
+            ("diff", "--no-ext-diff", "--shortstat"): " 1 file changed, 1 insertion(+)\n",
+            ("diff", "--cached", "--no-ext-diff", "--shortstat"): "",
         }
-        return subprocess.CompletedProcess(
-            args=command,
-            returncode=0,
-            stdout=stdout_by_args[git_args],
-            stderr="",
+        return CapturedProcessBytes(
+            exit_code=0,
+            duration_seconds=0.01,
+            timed_out=False,
+            stdout=stdout_by_args[git_args].encode("utf-8"),
+            stderr=b"",
+            stdout_truncated=False,
+            stderr_truncated=False,
         )
 
     monkeypatch.setattr("workbench_mcp.services.git_service.shutil.which", fake_which)
-    monkeypatch.setattr("workbench_mcp.services.git_service.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "workbench_mcp.services.git_service.run_bounded_subprocess",
+        fake_run_bounded_subprocess,
+    )
     service = GitService(make_config(workspace))
 
     status = service.status()
@@ -98,10 +122,68 @@ def test_git_status_uses_only_read_only_git_commands(
         ("rev-parse", "--is-inside-work-tree"),
         ("branch", "--show-current"),
         ("status", "--porcelain=v1"),
-        ("diff", "--shortstat"),
-        ("diff", "--cached", "--shortstat"),
+        ("diff", "--no-ext-diff", "--shortstat"),
+        ("diff", "--cached", "--no-ext-diff", "--shortstat"),
     ]
     assert not any(
         command[0] in {"push", "pull", "fetch", "reset", "checkout", "clean", "commit", "add"}
         for command in captured_commands
     )
+
+
+def test_git_status_reports_timeout_as_safe_service_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+
+    def fake_which(executable: str) -> str | None:
+        return "git" if executable == "git" else None
+
+    def fake_run_bounded_subprocess(
+        command: Sequence[str],
+        *,
+        cwd: Path,
+        timeout_seconds: int,
+        max_output_bytes: int,
+        env: Mapping[str, str] | None = None,
+        start_error_message: str,
+    ) -> CapturedProcessBytes:
+        assert command[0] == "git"
+        assert cwd == workspace
+        assert max_output_bytes > 0
+        assert env is not None
+        assert start_error_message.startswith("failed to start git")
+        return CapturedProcessBytes(
+            exit_code=None,
+            duration_seconds=float(timeout_seconds),
+            timed_out=True,
+            stdout=b"",
+            stderr=b"",
+            stdout_truncated=False,
+            stderr_truncated=False,
+        )
+
+    monkeypatch.setattr("workbench_mcp.services.git_service.shutil.which", fake_which)
+    monkeypatch.setattr(
+        "workbench_mcp.services.git_service.run_bounded_subprocess",
+        fake_run_bounded_subprocess,
+    )
+    service = GitService(make_config(workspace))
+
+    with pytest.raises(GitServiceError, match="timed out"):
+        service.status()
+
+
+def _git_subcommand_args(command: Sequence[str]) -> tuple[str, ...]:
+    tokens = list(command[1:])
+    while tokens:
+        item = tokens.pop(0)
+        if item == "--no-pager":
+            continue
+        if item == "-c":
+            del tokens[0]
+            continue
+        return (item, *tokens)
+    raise AssertionError(f"missing git subcommand in {command}")

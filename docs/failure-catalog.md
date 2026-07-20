@@ -287,3 +287,55 @@ This file records real implementation failures encountered while building the pr
 - Regression protection: after recovery, `docker build --progress=plain -t
   workbench-mcp:local .`, direct container smoke, `docker compose config`, and
   `docker compose run --rm --build workbench-mcp-smoke` all passed.
+
+## Final Pre-Release Audit
+
+### Subprocess output was bounded only after full capture
+
+- Symptom: `ProcessRunner` used `Popen.communicate()` and only then redacted/truncated
+  stdout and stderr.
+- Failing command: N/A; found during manual security audit.
+- Root cause: the configured output limit was applied to the returned MCP payload but not
+  to in-memory subprocess capture.
+- Fix: added `services/subprocess_capture.py` with concurrent bounded stdout/stderr
+  readers, reused it from `ProcessRunner`, and kept process-tree timeout cleanup.
+- Regression protection: `tests/unit/test_process_runner.py` now checks combined
+  stdout/stderr bounding.
+
+### Artifact collection read the whole artifact before truncating
+
+- Symptom: `ArtifactService.collect_artifact()` loaded the complete artifact into memory
+  before applying `MAX_OUTPUT_BYTES`.
+- Failing command: N/A; found during manual security audit.
+- Root cause: artifact output truncation happened after `Path.read_bytes()`.
+- Fix: artifact collection now reads a bounded prefix plus a fixed binary-detection sample
+  and reports the original file size separately.
+- Regression protection: `tests/security/test_artifact_service.py` covers truncation and
+  binary detection when the output limit is smaller than the binary sample.
+
+### Git inspection lacked bounded execution and external-diff hardening
+
+- Symptom: `GitService` used unbounded `subprocess.run()` calls and `git diff --shortstat`
+  without `--no-ext-diff`.
+- Failing command: N/A; found during manual malicious-repository review.
+- Root cause: read-only Git status commands were constrained by subcommand choice but not by
+  timeout/output limits or local Git diff configuration.
+- Fix: Git inspection now uses the bounded subprocess helper, configured timeout/output
+  limits, `--no-pager`, disabled terminal prompts, disabled optional locks, disabled
+  global/system config, and `--no-ext-diff` for diff-stat commands. Diagnostics now reports
+  Git inspection failures as warnings instead of failing without context.
+- Regression protection: `tests/unit/test_git_service.py` verifies the hardened command
+  shape and timeout handling; `tests/unit/test_diagnostics.py` verifies diagnostic warning
+  behavior.
+
+### Documentation pointed at the previous Phase 7 CI run
+
+- Symptom: README, runbook, checklist, and evidence still referenced the previous
+  successful Phase 7 CI run instead of the latest pushed Phase 7 commit.
+- Failing command: N/A; found by comparing `git log` with `gh run list`.
+- Root cause: Phase 7 documentation was committed after the earlier CI run.
+- Fix: documentation now records the successful latest pushed Phase 7 run
+  `29778875177` for commit `34fc81ae32e4404f01f3f460b43e6508e108421d` and states that
+  local final-audit fixes require a new CI run after push.
+- Regression protection: final reports must distinguish latest pushed CI from local,
+  unpushed audit commits.

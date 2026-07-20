@@ -7,8 +7,10 @@ import pytest
 from tests.helpers import make_config
 
 from workbench_mcp.config import AllowedCommand
+from workbench_mcp.errors import GitServiceError
 from workbench_mcp.services import diagnostics
 from workbench_mcp.services.diagnostics import DiagnosticsService
+from workbench_mcp.services.git_service import GitService
 
 
 def test_diagnostics_reports_info_and_warnings(tmp_path: Path) -> None:
@@ -63,5 +65,27 @@ def test_diagnostics_reports_warning_when_artifact_directory_is_not_writable(
 
     assert any(
         finding.severity == "warning" and "Artifact directory is not writable" in finding.evidence
+        for finding in report.findings
+    )
+
+
+def test_diagnostics_reports_warning_when_git_inspection_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    config = make_config(workspace)
+
+    def fail_status(_self: GitService) -> None:
+        raise GitServiceError("git status timed out")
+
+    monkeypatch.setattr(GitService, "status", fail_status)
+    service = DiagnosticsService(config)
+
+    report = service.diagnose_workspace()
+
+    assert any(
+        finding.severity == "warning" and "Git inspection failed" in finding.evidence
         for finding in report.findings
     )

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 from workbench_mcp.config import WorkbenchConfig
+from workbench_mcp.errors import GitServiceError
 from workbench_mcp.services.git_service import GitService
 
 Severity = Literal["info", "warning", "error"]
@@ -176,7 +177,20 @@ class DiagnosticsService:
                 )
 
     def _check_git(self, findings: list[DiagnosticFinding]) -> None:
-        status = GitService(self._config).status()
+        try:
+            status = GitService(self._config).status()
+        except GitServiceError as exc:
+            findings.append(
+                DiagnosticFinding(
+                    severity="warning",
+                    evidence=f"Git inspection failed: {exc}",
+                    probable_cause="Read-only Git status could not complete safely.",
+                    recommended_remediation=(
+                        "Inspect repository Git configuration and rerun diagnostics."
+                    ),
+                )
+            )
+            return
         if not status.is_repository:
             findings.append(
                 DiagnosticFinding(

@@ -82,7 +82,9 @@ Path checks in `security/paths.py` reject parent traversal, absolute-path escape
 escape, unresolvable paths, and paths outside approved roots. Command checks in
 `security/commands.py` reject shell operators, executable paths, whitespace executables,
 control characters, and non-allowlisted executables. Limit helpers enforce file size,
-UTF-8 text decoding, binary detection, and output truncation.
+UTF-8 text decoding, binary detection, and output truncation. Subprocess output is drained
+through bounded stdout/stderr readers so the configured output limit is applied before
+MCP-facing truncation.
 
 Secret and host-root redaction is applied before MCP-facing responses or error messages
 leave the tool layer.
@@ -115,7 +117,7 @@ blocked.
 Client-supplied `run_command` calls must use an executable configured in
 `ALLOWED_COMMANDS`. `run_tests` uses commands from `TEST_COMMANDS`. Both paths validate the
 working directory inside `WORKSPACE_ROOT`, apply a timeout, terminate the process tree where
-supported, capture stdout/stderr, redact secrets, and truncate output.
+supported, capture bounded stdout/stderr prefixes, redact secrets, and truncate output.
 
 This limits command invocation shape, but it does not make an allowlisted interpreter safe
 for untrusted code by itself.
@@ -144,11 +146,13 @@ Unexpected programming errors are still masked by FastMCP server configuration
 
 - `branch --show-current`
 - `status --porcelain=v1`
-- `diff --shortstat`
-- `diff --cached --shortstat`
+- `diff --no-ext-diff --shortstat`
+- `diff --cached --no-ext-diff --shortstat`
 
 It does not register push, pull, checkout, reset, clean, add, commit, branch deletion, or tag
-operations.
+operations. Git commands run with the configured timeout/output limit, `--no-pager`,
+`GIT_OPTIONAL_LOCKS=0`, terminal prompts disabled, global/system config disabled, and
+external diff disabled for diff statistics.
 
 ## Docker Runtime Model
 

@@ -19,9 +19,10 @@ modules. The main controls are:
 - Bare executable allowlists for client-requested commands.
 - Named predefined test commands.
 - `subprocess` argument arrays with `shell=False`.
-- File-size, output-size, and process-timeout limits.
+- File-size, bounded subprocess/artifact output, and process-timeout limits.
 - Secret-pattern and configured-root redaction before MCP-facing responses.
-- Read-only Git status behavior.
+- Read-only Git status behavior with bounded execution and external diff disabled for
+  diff-stat inspection.
 - Non-root Docker runtime image and smoke workflows without Docker socket, privileged mode,
   host networking, or published ports.
 

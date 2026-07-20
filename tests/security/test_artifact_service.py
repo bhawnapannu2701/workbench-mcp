@@ -26,6 +26,35 @@ def test_collects_valid_approved_artifact(tmp_path: Path) -> None:
     assert artifact.truncated is False
 
 
+def test_collect_artifact_truncates_large_text_without_full_output(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    config = make_config(workspace, max_output_bytes=5)
+    report_directory = config.artifact_directory / "test-reports"
+    report_directory.mkdir()
+    (report_directory / "large.txt").write_text("abcdef", encoding="utf-8")
+    service = ArtifactService(config)
+
+    artifact = service.collect_artifact("test_report", "large.txt")
+
+    assert artifact.size_bytes == 6
+    assert artifact.content == "abcde"
+    assert artifact.truncated is True
+
+
+def test_collect_artifact_keeps_binary_sample_when_output_limit_is_small(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    config = make_config(workspace, max_output_bytes=5)
+    report_directory = config.artifact_directory / "test-reports"
+    report_directory.mkdir()
+    (report_directory / "binary.log").write_bytes(b"abcde\x00hidden")
+    service = ArtifactService(config)
+
+    with pytest.raises(ArtifactAccessError, match="binary"):
+        service.collect_artifact("test_report", "binary.log")
+
+
 def test_rejects_artifact_path_traversal(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

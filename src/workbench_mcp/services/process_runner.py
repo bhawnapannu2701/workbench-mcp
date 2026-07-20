@@ -2,23 +2,16 @@
 
 from __future__ import annotations
 
-import os
-import platform
-import shutil
-import signal
-import subprocess
-import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
 from workbench_mcp.config import WorkbenchConfig
-from workbench_mcp.errors import PathSecurityError, ProcessExecutionError
+from workbench_mcp.errors import PathSecurityError
 from workbench_mcp.security.commands import validate_allowlisted_command, validate_command_tokens
 from workbench_mcp.security.limits import truncate_output_pair
 from workbench_mcp.security.paths import resolve_workspace_path
 from workbench_mcp.security.redaction import Redactor
+from workbench_mcp.services.subprocess_capture import run_bounded_subprocess
 
 
 @dataclass(frozen=True)
@@ -74,36 +67,15 @@ class ProcessRunner:
         if not safe_cwd.resolved.is_dir():
             msg = f"working directory is not a directory: {safe_cwd.display_path}"
             raise PathSecurityError(msg)
-        started_at = time.monotonic()
-        timed_out = False
-        exit_code: int | None
-        stdout_bytes: bytes
-        stderr_bytes: bytes
-
-        try:
-            process = _start_process(command, safe_cwd.resolved)
-        except OSError as exc:
-            msg = f"failed to start approved command: {command[0]}"
-            raise ProcessExecutionError(msg) from exc
-
-        try:
-            stdout_bytes, stderr_bytes = process.communicate(
-                timeout=self._config.max_command_seconds
-            )
-            exit_code = process.returncode
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            _terminate_process_tree(process)
-            try:
-                stdout_bytes, stderr_bytes = process.communicate(timeout=2)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                stdout_bytes, stderr_bytes = process.communicate()
-            exit_code = process.returncode
-
-        duration = time.monotonic() - started_at
-        stdout = self._redactor.redact(stdout_bytes.decode("utf-8", errors="replace"))
-        stderr = self._redactor.redact(stderr_bytes.decode("utf-8", errors="replace"))
+        captured = run_bounded_subprocess(
+            command,
+            cwd=safe_cwd.resolved,
+            timeout_seconds=self._config.max_command_seconds,
+            max_output_bytes=self._config.max_output_bytes,
+            start_error_message=f"failed to start approved command: {command[0]}",
+        )
+        stdout = self._redactor.redact(captured.stdout.decode("utf-8", errors="replace"))
+        stderr = self._redactor.redact(captured.stderr.decode("utf-8", errors="replace"))
         stdout, stderr, stdout_truncated, stderr_truncated = truncate_output_pair(
             stdout,
             stderr,
@@ -113,82 +85,11 @@ class ProcessRunner:
         return ProcessResult(
             command=command,
             cwd=safe_cwd.display_path,
-            exit_code=exit_code,
-            duration_seconds=duration,
-            timed_out=timed_out,
+            exit_code=captured.exit_code,
+            duration_seconds=captured.duration_seconds,
+            timed_out=captured.timed_out,
             stdout=stdout,
             stderr=stderr,
-            stdout_truncated=stdout_truncated,
-            stderr_truncated=stderr_truncated,
+            stdout_truncated=stdout_truncated or captured.stdout_truncated,
+            stderr_truncated=stderr_truncated or captured.stderr_truncated,
         )
-
-
-def _start_process(command: tuple[str, ...], cwd: Path) -> subprocess.Popen[bytes]:
-    if _is_windows():
-        return subprocess.Popen(  # noqa: S603
-            list(command),
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=False,
-            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
-        )
-    return subprocess.Popen(  # noqa: S603
-        list(command),
-        cwd=cwd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=False,
-        start_new_session=True,
-    )
-
-
-def _terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
-    if _is_windows():
-        taskkill = shutil.which("taskkill")
-        if taskkill is not None:
-            subprocess.run(  # noqa: S603
-                [taskkill, "/PID", str(process.pid), "/T", "/F"],
-                check=False,
-                capture_output=True,
-                shell=False,
-            )
-            return
-        process.kill()
-        return
-
-    try:
-        _terminate_posix_process_group(process)
-    except ProcessLookupError:
-        return
-    try:
-        process.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        _kill_posix_process_group(process)
-
-
-def _is_windows() -> bool:
-    return platform.system() == "Windows"
-
-
-def _terminate_posix_process_group(process: subprocess.Popen[bytes]) -> None:
-    _signal_posix_process_group(process, signal.SIGTERM)
-
-
-def _kill_posix_process_group(process: subprocess.Popen[bytes]) -> None:
-    kill_signal = cast(int, getattr(signal, "SIGKILL", signal.SIGTERM))
-    _signal_posix_process_group(process, kill_signal)
-
-
-def _signal_posix_process_group(process: subprocess.Popen[bytes], signal_number: int) -> None:
-    killpg = getattr(os, "killpg", None)
-    getpgid = getattr(os, "getpgid", None)
-    if not callable(killpg) or not callable(getpgid):
-        process.terminate()
-        return
-
-    typed_killpg = cast(Callable[[int, int], None], killpg)
-    typed_getpgid = cast(Callable[[int], int], getpgid)
-    typed_killpg(typed_getpgid(process.pid), signal_number)

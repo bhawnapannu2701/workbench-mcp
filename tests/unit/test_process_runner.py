@@ -123,6 +123,31 @@ def test_truncates_output(tmp_path: Path) -> None:
     assert len(result.stdout.encode("utf-8")) == TRUNCATED_OUTPUT_BYTES
 
 
+def test_bounds_stdout_and_stderr_capture(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    runner = ProcessRunner(
+        make_config(
+            workspace,
+            allowed_commands=(python_allowed_command(),),
+            max_output_bytes=TRUNCATED_OUTPUT_BYTES,
+        )
+    )
+
+    result = runner.run_command(
+        (
+            "python",
+            "-c",
+            "import sys; sys.stdout.write('x' * 100); sys.stderr.write('y' * 100)",
+        )
+    )
+
+    total_output_bytes = len(result.stdout.encode("utf-8")) + len(result.stderr.encode("utf-8"))
+    assert total_output_bytes <= TRUNCATED_OUTPUT_BYTES
+    assert result.stdout_truncated is True
+    assert result.stderr_truncated is True
+
+
 def test_redacts_configured_secrets(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

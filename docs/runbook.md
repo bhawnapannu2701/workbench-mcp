@@ -137,8 +137,10 @@ installs locked dependencies, checks the lockfile, runs Ruff format/lint, mypy, 
 coverage, explicit Linux symlink security tests, package build, stdio MCP smoke test,
 Docker build, direct container smoke, Compose config, and Compose smoke.
 
-Remote evidence: GitHub Actions run `29775378084` completed successfully for commit
-`4efddd89c8aed22310f3dc14a74ed1e215ec21e1` on branch `codex/workbench-mcp-v1`.
+Remote evidence: GitHub Actions run `29778875177` completed successfully for the latest
+pushed Phase 7 commit `34fc81ae32e4404f01f3f460b43e6508e108421d` on branch
+`codex/workbench-mcp-v1`. Local final-audit fixes after that commit require a new CI run
+after push.
 
 ## Release Preparation Rules
 

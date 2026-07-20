@@ -50,9 +50,9 @@ Status values:
 | Allowlisted process execution | `src/workbench_mcp/security/commands.py`, `src/workbench_mcp/services/process_runner.py` | `tests/unit/test_process_runner.py` | `uv run pytest` | Verified |
 | Argument-array execution without `shell=True` | `src/workbench_mcp/services/process_runner.py` | `tests/unit/test_process_runner.py`; repository search | `uv run ruff check .`; `rg ...` | Verified |
 | Workspace-contained working directory | `src/workbench_mcp/services/process_runner.py` | `tests/unit/test_process_runner.py` | `uv run pytest` | Verified |
-| Timeouts and process cleanup where testable | `src/workbench_mcp/services/process_runner.py` | `tests/unit/test_process_runner.py` | `uv run pytest` | Verified |
+| Timeouts and process cleanup where testable | `src/workbench_mcp/services/subprocess_capture.py`, `src/workbench_mcp/services/process_runner.py` | `tests/unit/test_process_runner.py`, `tests/unit/test_git_service.py` | `uv run pytest` | Verified |
 | stdout/stderr capture | `src/workbench_mcp/services/process_runner.py` | `tests/unit/test_process_runner.py` | `uv run pytest` | Verified |
-| Output truncation | `src/workbench_mcp/security/limits.py`, `src/workbench_mcp/services/process_runner.py` | `tests/unit/test_process_runner.py` | `uv run pytest` | Verified |
+| Output bounding and truncation | `src/workbench_mcp/security/limits.py`, `src/workbench_mcp/services/subprocess_capture.py`, `src/workbench_mcp/services/process_runner.py`, `src/workbench_mcp/services/artifact_service.py` | `tests/unit/test_process_runner.py`, `tests/security/test_artifact_service.py` | `uv run pytest` | Verified |
 | Secret redaction | `src/workbench_mcp/security/redaction.py`, `src/workbench_mcp/tools/common.py` | `tests/unit/test_process_runner.py`, `tests/unit/test_mcp_server.py` | `uv run pytest` | Verified |
 | Predefined test-command execution | `src/workbench_mcp/services/test_runner.py` | `tests/unit/test_test_runner.py`, `tests/unit/test_mcp_server.py` | `uv run pytest` | Verified |
 | Read-only Git status and no destructive Git action | `src/workbench_mcp/services/git_service.py` | `tests/unit/test_git_service.py`, `tests/unit/test_mcp_server.py` | `uv run pytest` | Verified |
@@ -79,8 +79,7 @@ Status values:
 
 | Requirement | Source file | Test file | Verification command | Status |
 | --- | --- | --- | --- | --- |
-| Full pytest suite | `src/workbench_mcp/**` | `tests/**` | `uv run pytest` | Verified: 83 passed, 4 skipped |
-| Coverage measurement | `src/workbench_mcp/**` | `tests/**` | `uv run pytest --cov=workbench_mcp --cov-report=term-missing` | Verified: combined 83%, 1074/1254 statements, 200/274 branches |
+| Full pytest suite | `src/workbench_mcp/**` | `tests/**` | `uv run pytest -rs` | Verified in final audit: 94 passed, 4 skipped |
+| Coverage measurement | `src/workbench_mcp/**` | `tests/**` | `uv run pytest --cov=workbench_mcp --cov-report=term-missing` | Verified in final audit: display coverage 83% |
 | Package build | `pyproject.toml`, `src/workbench_mcp/**` | N/A | `uv build` | Verified: sdist and wheel built |
 | Security review search | Full repository | N/A | `rg ...` searches listed in `PROJECT_EVIDENCE.md` | Verified; no production security defects found |
-
