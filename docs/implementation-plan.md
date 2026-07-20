@@ -42,7 +42,7 @@ scripts/
 artifacts/
 ```
 
-Phase 1 established the package metadata, repository rules, validated configuration layer, and configuration tests. Phases 2 and 3 added the secure service layer. Phase 4 added FastMCP tool/resource registration and stdio startup. Phase 5 completed broad security and integration validation. Phase 6 adds Docker packaging and CI configuration. Later phases will add demo automation, documentation hardening, and final review.
+Phase 1 established the package metadata, repository rules, validated configuration layer, and configuration tests. Phases 2 and 3 added the secure service layer. Phase 4 added FastMCP tool/resource registration and stdio startup. Phase 5 completed broad security and integration validation. Phase 6 added Docker packaging and CI configuration. Phase 7 adds public documentation, a reproducible demo, and release-preparation evidence. Phase 8 is reserved for the independent final audit.
 
 ## Security Boundaries
 
@@ -77,19 +77,21 @@ Phase 1 established the package metadata, repository rules, validated configurat
   coverage.
 - Phase 4: FastMCP `3.4.4` APIs were verified from the installed package. The server now
   registers the ten required MCP tools plus `workbench://server-info`, supports stdio
-  transport, and has in-memory and stdio MCP client tests. Streamable HTTP is supported by
-  FastMCP but remains unimplemented in this project because no validated HTTP configuration
-  or port-binding policy exists yet.
+  transport, and has in-memory and stdio MCP client tests. HTTP and Streamable HTTP remain
+  unimplemented in this project because no validated HTTP configuration or port-binding
+  policy exists yet.
 - Phase 5: full test, security-search, coverage, package-build, and MCP stdio smoke
   verification completed. The full suite reported 83 passed and 4 Windows symlink skips.
   Coverage was measured at combined 83%, with 1074/1254 statements and 200/274 branches
   covered. `uv build` produced the source distribution and wheel.
 - Phase 6: Docker packaging, Docker Compose smoke workflow, container smoke testing, and
   GitHub Actions CI configuration implemented. Local Docker verification is recorded in
-  `PROJECT_EVIDENCE.md`. Remote GitHub Actions execution is not verified until the branch is
-  pushed and the workflow runs on GitHub.
-- Later phases must not assume demo automation or final documentation hardening are complete
-  until those phases verify them.
+  `PROJECT_EVIDENCE.md`.
+- Phase 7: public README, architecture docs, threat model, runbook, debugging notes,
+  security policy, contributing guide, changelog, release checklist, project evidence, and
+  reproducible demo are prepared. Remote GitHub Actions is green for commit
+  `4efddd89c8aed22310f3dc14a74ed1e215ec21e1`.
+- Phase 8 remains the independent final audit and has not started.
 
 ## Testing Strategy
 

@@ -225,3 +225,65 @@ This file records real implementation failures encountered while building the pr
   selection, Windows avoidance of POSIX UID/GID APIs, root UID rejection to preserve the
   non-root smoke requirement, report read and temp cleanup success, and non-zero propagation
   for unexpected container failures.
+
+## Phase 7
+
+### Public demo script had an unterminated fixture string
+
+- Symptom: the first focused Ruff/compile check for `scripts/run-demo.py` failed with
+  `missing closing quote in string literal`.
+- Failing command: `uv run ruff check scripts\run-demo.py tests\e2e\test_public_demo.py`
+- Root cause: the diagnostic JSON fixture string had mismatched quote characters.
+- Fix: corrected the string to a valid JSON text literal.
+- Regression protection: `uv run python -m py_compile scripts\run-demo.py`, Ruff, and
+  `tests/e2e/test_public_demo.py` all cover the script.
+
+### Hyphenated demo script import triggered a dataclass/importlib issue
+
+- Symptom: `tests/e2e/test_public_demo.py` failed while importing `scripts/run-demo.py`
+  because `dataclasses` could not find the dynamically loaded module in `sys.modules`.
+- Failing command: `uv run pytest tests\e2e\test_public_demo.py -q`
+- Root cause: the importlib test helper executed the script module without first registering
+  it under `spec.name`.
+- Fix: inserted the module into `sys.modules` before `exec_module`.
+- Regression protection: the focused E2E demo test now imports and runs the script.
+
+### Expected blocked demo operation logged a noisy error line
+
+- Symptom: `uv run python scripts\run-demo.py` succeeded but printed an extra FastMCP error
+  line for the intentionally blocked traversal read.
+- Failing command: N/A; the demo succeeded but the human summary was noisy.
+- Root cause: FastMCP logs expected `ToolError` calls unless logging is suppressed around
+  the intentional negative test.
+- Fix: temporarily disabled logging only while exercising the expected blocked operation.
+- Regression protection: the demo command now prints a concise success summary while the
+  JSON report records the blocked operation.
+
+### Explicit stdio smoke timed out when run in parallel with other heavy checks
+
+- Symptom: `tests/e2e/test_mcp_stdio.py` timed out during FastMCP client initialization
+  when run in parallel with package build and the public demo.
+- Failing command: `uv run pytest tests\e2e\test_mcp_stdio.py -q`
+- Root cause: startup-sensitive stdio smoke verification was run concurrently with other
+  repository checks. The full test suite had already passed, and rerunning the stdio smoke
+  serially passed with `1 passed in 4.07s`.
+- Fix: reran the MCP stdio smoke test serially and recorded serial execution guidance in
+  `docs/debugging.md`.
+- Regression protection: the complete pytest suite and explicit serial stdio smoke command
+  both pass in Phase 7 verification.
+
+### Docker Desktop engine returned API 500 after a timed-out build
+
+- Symptom: `docker build -t workbench-mcp:local .` hit the local command timeout, and
+  subsequent `docker ps`, `docker image ls`, `docker info`, and `docker version` calls
+  either hung or returned Docker API 500 errors.
+- Failing command: `docker build -t workbench-mcp:local .`
+- Root cause: local Docker Desktop's Linux/WSL engine became unhealthy and logs showed it
+  was waiting for the Linux/WSL init control API. This was an environment failure, not a
+  Dockerfile failure.
+- Fix: terminated stale Docker CLI/buildx processes, stopped Docker Desktop processes,
+  terminated the `docker-desktop` WSL distro, ran `wsl --shutdown`, relaunched Docker
+  Desktop, and waited for `docker info` to return `28.3.3 linux x86_64`.
+- Regression protection: after recovery, `docker build --progress=plain -t
+  workbench-mcp:local .`, direct container smoke, `docker compose config`, and
+  `docker compose run --rm --build workbench-mcp-smoke` all passed.

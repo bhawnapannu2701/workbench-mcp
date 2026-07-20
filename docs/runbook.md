@@ -1,55 +1,82 @@
 # Runbook
 
-Operational notes for running and verifying `workbench-mcp` locally.
+Operational notes for local verification and release preparation.
 
-## Local Checks
+## Preconditions
 
-Use the project-managed uv environment:
+- Python compatible with `>=3.12,<3.14`.
+- `uv` installed. In this Windows shell, use
+  `$env:APPDATA\Python\Python313\Scripts\uv.exe` because bare `uv` is not on PATH.
+- Git available on PATH for Git status tests and the public demo.
+- Docker Desktop or Docker Engine available for container checks.
+
+## Local Quality Checks
+
+Standard command form:
+
+```bash
+uv sync --frozen --all-groups
+uv run ruff format --check .
+uv run ruff check .
+uv run mypy src
+uv run pytest -rs
+uv run pytest --cov=workbench_mcp --cov-report=term-missing
+uv build
+uv run pytest tests/e2e/test_mcp_stdio.py
+uv run python scripts/run-demo.py
+```
+
+Windows command prefix used in this repository verification:
 
 ```powershell
-& $env:APPDATA\Python\Python313\Scripts\uv.exe sync --frozen --all-groups
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run ruff format --check .
 & $env:APPDATA\Python\Python313\Scripts\uv.exe run ruff check .
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run mypy src
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run pytest -rs
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run pytest --cov=workbench_mcp --cov-report=term-missing
-& $env:APPDATA\Python\Python313\Scripts\uv.exe build
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run pytest tests\e2e\test_mcp_stdio.py
 ```
 
 ## Stdio Server
 
-The project currently supports and verifies stdio transport only:
+The project supports stdio only:
 
-```powershell
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run workbench-mcp --transport stdio
+```bash
+uv run workbench-mcp --transport stdio
+```
+
+This command starts a long-running MCP stdio server for an MCP client. For an automated
+local smoke test, run:
+
+```bash
+uv run pytest tests/e2e/test_mcp_stdio.py
 ```
 
 Do not configure HTTP ports for this project until HTTP configuration, binding policy, and
-smoke tests are implemented.
+HTTP smoke tests are implemented.
+
+## Public Demo
+
+```bash
+uv run python scripts/run-demo.py
+```
+
+The demo writes `artifacts/demo/workbench-demo-report.json`. It creates and removes a
+temporary Git workspace; it does not require private credentials. The expected blocked
+traversal attempt is recorded as a successful security check, not as a demo failure.
 
 ## Docker Build
 
-Build the local runtime image:
-
-```powershell
+```bash
 docker build -t workbench-mcp:local .
 docker image inspect workbench-mcp:local
 ```
 
-The runtime image uses a digest-pinned `python:3.13.3-slim-bookworm` base, installs runtime
-dependencies from `uv.lock`, and runs as UID/GID `10001:10001`.
+The runtime image uses a digest-pinned `python:3.13.3-slim-bookworm` base, installs locked
+runtime dependencies from `uv.lock`, and runs as UID/GID `10001:10001`.
 
 ## Container Smoke Test
 
-Run the host-side smoke helper:
-
-```powershell
-& $env:APPDATA\Python\Python313\Scripts\uv.exe run python scripts\run-container-smoke.py --image workbench-mcp:local
+```bash
+uv run python scripts/run-container-smoke.py --image workbench-mcp:local
 ```
 
-The helper creates a temporary workspace and artifact directory, then starts the container
-with:
+The helper creates temporary host mounts and starts the container with:
 
 - read-only root filesystem
 - tmpfs-backed `/tmp`
@@ -60,14 +87,23 @@ with:
 - read-write `/artifacts` bind mount
 - `READ_ONLY_MODE=true`
 
-The container-local smoke script verifies package import, configuration loading, FastMCP
-server construction, expected tool registration, server-information resource registration,
-non-root execution, workspace read access, read-only write rejection, artifact collection,
-artifact escape rejection, and workspace path escape rejection.
+It verifies package import, configuration loading, server construction, expected tool
+registration, server-information resource registration, non-root execution, workspace read
+access, read-only write rejection, artifact collection, artifact escape rejection, and
+workspace path escape rejection.
 
 ## Docker Compose Smoke
 
-Prepare local demo mounts and run the Compose smoke service:
+Linux/macOS shell:
+
+```bash
+mkdir -p .workbench-demo/workspace .workbench-demo/artifacts
+printf 'hello compose\n' > .workbench-demo/workspace/smoke.txt
+docker compose config
+docker compose run --rm --build workbench-mcp-smoke
+```
+
+PowerShell mount preparation:
 
 ```powershell
 New-Item -ItemType Directory -Force .workbench-demo\workspace, .workbench-demo\artifacts | Out-Null
@@ -76,27 +112,38 @@ docker compose config
 docker compose run --rm --build workbench-mcp-smoke
 ```
 
-The Compose workflow is a finite smoke command, not a persistent web service. It publishes
-no ports because the project does not implement HTTP transport.
+The Compose workflow is a finite smoke command, not a persistent service. It publishes no
+ports because this project does not implement HTTP transport.
 
 The `.workbench-demo` directory is ignored by Git and excluded from Docker build context.
-Remove it only when no smoke workflow is using it.
 
 ## Mount Permissions
 
 On Linux, run bind-mounted smoke workflows with the current host UID/GID so generated
 artifacts remain removable by the host cleanup process. The direct smoke helper does this
-automatically on POSIX hosts. For Compose, set
-`WORKBENCH_MCP_CONTAINER_USER="$(id -u):$(id -g)"` when using host bind mounts. The workspace
-mount should normally be read-only.
+automatically on POSIX hosts. For Compose in CI or local Linux shells, set:
 
-On Docker Desktop for Windows, bind-mount permissions are mediated by Docker Desktop. The
-smoke workflows verify the effective read/write behavior rather than assuming POSIX mode
-bits map exactly.
+```bash
+export WORKBENCH_MCP_CONTAINER_USER="$(id -u):$(id -g)"
+```
+
+Docker Desktop for Windows mediates bind-mount permissions differently. The smoke workflows
+verify actual read/write behavior instead of assuming POSIX mode bits map exactly.
 
 ## CI
 
-The GitHub Actions workflow runs on Ubuntu and executes the symlink security tests that may
-skip locally on this Windows host due `WinError 1314`. The workflow requires no secrets and
-uses `contents: read` permissions. Remote GitHub Actions status after the container-smoke
-ownership fix is not yet verified.
+`.github/workflows/ci.yml` runs on Ubuntu 24.04 with Python `3.13.3` and uv `0.11.29`. It
+installs locked dependencies, checks the lockfile, runs Ruff format/lint, mypy, pytest with
+coverage, explicit Linux symlink security tests, package build, stdio MCP smoke test,
+Docker build, direct container smoke, Compose config, and Compose smoke.
+
+Remote evidence: GitHub Actions run `29775378084` completed successfully for commit
+`4efddd89c8aed22310f3dc14a74ed1e215ec21e1` on branch `codex/workbench-mcp-v1`.
+
+## Release Preparation Rules
+
+- Do not merge into `main` during Phase 7.
+- Do not create a Git tag or GitHub release during Phase 7.
+- Do not publish a package or Docker image during Phase 7.
+- Do not apply, drop, or delete existing stashes.
+- Do not start the independent final audit until Phase 7 is committed.
