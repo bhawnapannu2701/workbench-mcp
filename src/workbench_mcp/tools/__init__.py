@@ -1,0 +1,1 @@
+"""FastMCP tool registration helpers."""

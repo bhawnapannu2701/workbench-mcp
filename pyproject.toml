@@ -26,6 +26,9 @@ dependencies = [
   "pydantic==2.13.4",
 ]
 
+[project.scripts]
+workbench-mcp = "workbench_mcp.server:main"
+
 [dependency-groups]
 dev = [
   "build==1.5.0",

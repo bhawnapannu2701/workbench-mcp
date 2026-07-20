@@ -46,10 +46,8 @@ class DiagnosticsService:
         findings.append(
             DiagnosticFinding(
                 severity="info",
-                evidence="Streamable HTTP mode is not configured in the Phase 3 service layer.",
-                probable_cause=(
-                    "HTTP transport support is deferred until FastMCP server wiring is implemented."
-                ),
+                evidence="Streamable HTTP mode is not enabled in the current server configuration.",
+                probable_cause=("Phase 4 implements and verifies stdio transport only."),
                 recommended_remediation=(
                     "Only check HTTP port conflicts after HTTP mode is added and enabled."
                 ),

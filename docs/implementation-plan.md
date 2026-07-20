@@ -42,7 +42,7 @@ scripts/
 artifacts/
 ```
 
-Phase 1 establishes the package metadata, repository rules, validated configuration layer, and configuration tests. Later phases will add security helpers, services, MCP tool registration, Docker, CI, and demo automation.
+Phase 1 established the package metadata, repository rules, validated configuration layer, and configuration tests. Phases 2 and 3 added the secure service layer. Phase 4 added FastMCP tool/resource registration and stdio startup. Later phases will add broader validation, Docker, CI, documentation hardening, and demo automation.
 
 ## Security Boundaries
 
@@ -75,7 +75,13 @@ Phase 1 establishes the package metadata, repository rules, validated configurat
 - Phase 3: allowlisted process execution, predefined test execution, read-only Git status,
   approved artifact collection, and workspace diagnostics implemented with unit/security
   coverage.
-- Later phases must not assume MCP tools exist until Phase 4 registers and verifies them.
+- Phase 4: FastMCP `3.4.4` APIs were verified from the installed package. The server now
+  registers the ten required MCP tools plus `workbench://server-info`, supports stdio
+  transport, and has in-memory and stdio MCP client tests. Streamable HTTP is supported by
+  FastMCP but remains unimplemented in this project because no validated HTTP configuration
+  or port-binding policy exists yet.
+- Later phases must not assume Docker, CI, demo automation, package builds, or coverage
+  reporting are complete until those phases verify them.
 
 ## Testing Strategy
 
@@ -83,6 +89,7 @@ Phase 1 establishes the package metadata, repository rules, validated configurat
 - Integration tests will cover service interactions against temporary repositories and workspaces.
 - Security tests will cover traversal, symlink escape, oversized files, binary rejection, blocked executables, shell operators, truncation, timeout, and secret redaction.
 - End-to-end tests will start the MCP server and exercise at least one real client/server interaction.
+- Phase 4 added a real stdio FastMCP client/server E2E test using `StdioTransport`.
 - Tests must use temporary directories and must not modify unrelated developer files.
 
 ## Docker Strategy

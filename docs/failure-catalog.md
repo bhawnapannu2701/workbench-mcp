@@ -95,3 +95,29 @@ This file records real implementation failures encountered while building the pr
 - Root cause: `GitService` attempted to run Git with a `cwd` that no longer existed.
 - Fix: `GitService` now returns non-repository status before spawning Git when the workspace path is missing or not a directory.
 - Regression protection: diagnostics tests cover the disappeared-workspace error path.
+
+## Phase 4
+
+### PowerShell rejected Bash-style heredoc syntax
+
+- Symptom: the first FastMCP introspection command failed before Python ran.
+- Failing command: `uv run python - <<'PY'`
+- Root cause: PowerShell does not support Bash heredoc redirection syntax.
+- Fix: reran the introspection using a PowerShell here-string piped to `uv run python -`.
+- Regression protection: Phase 4 notes record the exact PowerShell-compatible verification commands.
+
+### Ad hoc stdio smoke test used malformed JSON configuration
+
+- Symptom: the first real stdio client/server smoke attempt exited during startup with a `ConfigError` for `TEST_COMMANDS`.
+- Failing command: PowerShell here-string script invoking `StdioTransport(sys.executable, ["-m", "workbench_mcp.server"], ...)`
+- Root cause: the hand-written JSON string embedded quotes inside the test command without escaping them correctly.
+- Fix: generated the `TEST_COMMANDS` environment value with `json.dumps`.
+- Regression protection: `tests/e2e/test_mcp_stdio.py` builds the environment configuration with `json.dumps` and performs a real stdio MCP client/server interaction.
+
+### Ruff failed on initial Phase 4 formatting and lint
+
+- Symptom: Ruff reported unformatted files, import ordering, a local import in `tools/common.py`, and a Python 3.12 generic-style lint.
+- Failing commands: `uv run ruff format --check .` and `uv run ruff check .`
+- Root cause: new server/tool/test files were edited manually before formatter and import sorting were applied.
+- Fix: moved the package version import to module scope, updated `call_safely` to Python 3.12 type-parameter syntax, ran `uv run ruff format .`, and ran `uv run ruff check . --fix`.
+- Regression protection: Phase 4 verification reran Ruff format check and lint successfully.
