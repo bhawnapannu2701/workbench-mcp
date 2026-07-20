@@ -160,8 +160,11 @@ Configured checks:
 - Docker Compose smoke workflow
 - Test and coverage artifact upload
 
-Remote GitHub Actions status has not been verified because the branch has not been pushed and
-the workflow has not run on GitHub.
+Remote GitHub Actions status after the container-smoke ownership fix has not been verified
+yet. The first remote workflow run failed only at the direct container smoke step with
+`PermissionError: [Errno 13] Permission denied: 'container-smoke.json'` during Linux
+temporary-directory cleanup; the local fix preserves host-compatible bind-mount ownership on
+POSIX smoke runs, but remote CI has not been rerun green.
 
 ## Security Controls And Supporting Tests
 
@@ -206,6 +209,10 @@ the workflow has not run on GitHub.
 - Compose drops all Linux capabilities and uses `no-new-privileges:true`.
 - Compose uses `read_only: true` plus tmpfs-backed `/tmp`.
 - Workspace mount is read-only by default; artifact mount is explicitly writable.
+- The direct container smoke runner uses the non-root POSIX host UID/GID for bind-mounted
+  smoke artifacts where available, and keeps the image default non-root user on Windows.
+- The CI Compose smoke workflow sets `WORKBENCH_MCP_CONTAINER_USER=$(id -u):$(id -g)` so
+  Linux bind-mounted smoke artifacts remain owned by the GitHub runner user.
 
 ## Known Limitations
 

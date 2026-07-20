@@ -81,8 +81,8 @@ jobs:
         run: |
           mkdir -p .workbench-demo/workspace .workbench-demo/artifacts
           printf 'hello compose\n' > .workbench-demo/workspace/smoke.txt
-          chmod -R a+rX .workbench-demo/workspace
-          chmod -R a+rwX .workbench-demo/artifacts
+          chmod -R u+rwX,go-rwx .workbench-demo
+          echo "WORKBENCH_MCP_CONTAINER_USER=$(id -u):$(id -g)" >> "$GITHUB_ENV"
 
       - name: Validate Compose configuration
         env:

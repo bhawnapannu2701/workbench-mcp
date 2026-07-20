@@ -84,8 +84,11 @@ Remove it only when no smoke workflow is using it.
 
 ## Mount Permissions
 
-On Linux, ensure the artifact mount is writable by UID/GID `10001` or has compatible group
-or mode bits. The workspace mount should normally be read-only.
+On Linux, run bind-mounted smoke workflows with the current host UID/GID so generated
+artifacts remain removable by the host cleanup process. The direct smoke helper does this
+automatically on POSIX hosts. For Compose, set
+`WORKBENCH_MCP_CONTAINER_USER="$(id -u):$(id -g)"` when using host bind mounts. The workspace
+mount should normally be read-only.
 
 On Docker Desktop for Windows, bind-mount permissions are mediated by Docker Desktop. The
 smoke workflows verify the effective read/write behavior rather than assuming POSIX mode
@@ -95,5 +98,5 @@ bits map exactly.
 
 The GitHub Actions workflow runs on Ubuntu and executes the symlink security tests that may
 skip locally on this Windows host due `WinError 1314`. The workflow requires no secrets and
-uses `contents: read` permissions. Remote GitHub Actions status is not verified until the
-branch is pushed and the workflow runs on GitHub.
+uses `contents: read` permissions. Remote GitHub Actions status after the container-smoke
+ownership fix is not yet verified.

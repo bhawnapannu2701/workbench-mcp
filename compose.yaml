@@ -11,7 +11,7 @@ services:
         DEBIAN_VARIANT: bookworm
         PYTHON_BASE_DIGEST: "sha256:56a11364ffe0fee3bd60af6d6d5209eba8a99c2c16dc4c7c5861dc06261503cc"
         UV_VERSION: "0.11.29"
-    user: "10001:10001"
+    user: "${WORKBENCH_MCP_CONTAINER_USER:-10001:10001}"
     entrypoint: ["python", "/app/scripts/container-smoke-test.py"]
     read_only: true
     tmpfs:

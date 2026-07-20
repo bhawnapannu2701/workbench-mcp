@@ -199,3 +199,29 @@ This file records real implementation failures encountered while building the pr
   and excluded from Docker build context.
 - Regression protection: `.gitignore` and `.dockerignore` exclude `.workbench-demo`, and
   final Git status ignores it.
+
+### Remote GitHub Actions container smoke cleanup failed on Linux
+
+- Symptom: the first remote GitHub Actions workflow failed only at the direct container smoke
+  step while `tempfile.TemporaryDirectory` was cleaning up the bind-mounted artifact tree.
+- Failing command: `uv run python scripts/run-container-smoke.py --image workbench-mcp:ci`
+- Error: `PermissionError: [Errno 13] Permission denied: 'container-smoke.json'`.
+- Root cause: the host smoke runner made the artifact bind mount world-writable with
+  `chmod 0777`, then ran the container as the image default user `10001:10001`. On Linux,
+  `scripts/container-smoke-test.py` created `artifacts/diagnostics` as UID/GID
+  `10001:10001` with mode `0755` and wrote `container-smoke.json` as UID/GID
+  `10001:10001` with mode `0644`. The GitHub runner owned the temporary root and artifact
+  mount, but it did not own the nested `diagnostics` directory and had no write permission
+  there, so `shutil.rmtree` could not unlink the report.
+- Why Windows did not reproduce it: Docker Desktop for Windows mediates bind-mount
+  permissions through its file-sharing layer instead of exposing the same Linux host UID/GID
+  ownership semantics to the Windows cleanup process.
+- Fix: the direct smoke runner now runs the container as the non-root host UID/GID on POSIX
+  systems, leaves Windows on the image default user, removes the `0777` chmod, and verifies
+  the generated JSON report is host-readable before temporary-directory cleanup. The Compose
+  CI smoke path now sets `WORKBENCH_MCP_CONTAINER_USER=$(id -u):$(id -g)` and prepares the
+  demo mount as runner-private instead of world-writable.
+- Regression protection: `tests/unit/test_run_container_smoke.py` covers POSIX UID/GID
+  selection, Windows avoidance of POSIX UID/GID APIs, root UID rejection to preserve the
+  non-root smoke requirement, report read and temp cleanup success, and non-zero propagation
+  for unexpected container failures.
