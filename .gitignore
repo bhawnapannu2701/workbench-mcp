@@ -209,6 +209,11 @@ tempCodeRunnerFile.py
 # PyPI configuration file
 .pypirc
 
+# workbench-mcp local artifacts and reports
+artifacts/*
+!artifacts/.gitkeep
+.workbench-artifacts/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
