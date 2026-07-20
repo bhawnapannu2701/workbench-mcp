@@ -72,6 +72,9 @@ Phase 1 establishes the package metadata, repository rules, validated configurat
 - Phase 1: foundation and configuration implemented on branch `codex/workbench-mcp-v1`.
 - Phase 2: path-security helpers, filesystem listing/reading, text search, and controlled
   patching services implemented with unit and security coverage.
+- Phase 3: allowlisted process execution, predefined test execution, read-only Git status,
+  approved artifact collection, and workspace diagnostics implemented with unit/security
+  coverage.
 - Later phases must not assume MCP tools exist until Phase 4 registers and verifies them.
 
 ## Testing Strategy

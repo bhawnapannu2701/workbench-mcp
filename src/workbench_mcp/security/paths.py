@@ -30,6 +30,9 @@ class SafePath:
         return "." if str(self.relative) == "." else self.relative.as_posix()
 
 
+ContainedPath = SafePath
+
+
 def ensure_within_root(root: Path, candidate: Path) -> Path:
     """Resolve a candidate path and ensure it remains inside root."""
 
@@ -84,6 +87,35 @@ def resolve_workspace_path(
         root=root,
         resolved=resolved,
         relative=resolved.relative_to(root),
+        requested=_display_requested(requested_path),
+    )
+
+
+def resolve_contained_path(
+    root: Path,
+    requested_path: str | Path,
+    *,
+    must_exist: bool = True,
+    reject_traversal: bool = True,
+) -> ContainedPath:
+    """Resolve a requested path inside an arbitrary approved root."""
+
+    if reject_traversal:
+        return resolve_workspace_path(root, requested_path, must_exist=must_exist)
+
+    # Phase 3 callers currently use traversal rejection. This branch exists for future
+    # service code that may need to validate generated paths without rechecking segments.
+    resolved_root = root.expanduser().resolve()
+    requested = _coerce_requested_path(requested_path)
+    candidate = requested if requested.is_absolute() else resolved_root / requested
+    resolved = candidate.expanduser().resolve(strict=must_exist)
+    if not _is_relative_to(resolved, resolved_root):
+        msg = f"path resolves outside approved root: {_display_requested(requested_path)}"
+        raise PathEscapeError(msg)
+    return SafePath(
+        root=resolved_root,
+        resolved=resolved,
+        relative=resolved.relative_to(resolved_root),
         requested=_display_requested(requested_path),
     )
 

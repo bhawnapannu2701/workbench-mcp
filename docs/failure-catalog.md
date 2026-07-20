@@ -61,3 +61,37 @@ This file records real implementation failures encountered while building the pr
 - Root cause: the tests used `Path.write_text()` without an explicit newline policy for files whose exact bytes were asserted or patched.
 - Fix: updated exact-content test fixtures to write with `newline="\n"`.
 - Regression protection: Phase 2 tests now assert exact reads and patch preconditions using platform-stable fixture files.
+
+## Phase 3
+
+### Bare `uv` executable was not on PATH
+
+- Symptom: `where.exe uv` could not find a bare `uv` executable on PATH.
+- Failing command: `where.exe uv`
+- Root cause: `uv.exe` was installed in the Python user Scripts directory, which this shell did not include on PATH.
+- Fix: invoked the requested `uv run ...` checks through `C:\Users\hp\AppData\Roaming\Python\Python313\Scripts\uv.exe`.
+- Regression protection: final Phase 3 verification records the exact executable path used for `uv run` commands.
+
+### Ruff lint failed on recovered Phase 3 tests
+
+- Symptom: Ruff reported import-order issues and `S603` warnings in Git setup tests.
+- Failing command: `python -m uv run ruff check .`
+- Root cause: recovered test files had unsorted imports, and Git test setup used `subprocess.run()` to create a temporary repository.
+- Fix: ran Ruff's safe import fixer and annotated the test-only Git setup subprocess calls with `# noqa: S603` after resolving `git` with `shutil.which()`.
+- Regression protection: `uv run ruff check .` is part of Phase 3 verification.
+
+### mypy failed on POSIX-only process cleanup calls on Windows
+
+- Symptom: mypy reported that `os.killpg` and `signal.SIGKILL` were unavailable.
+- Failing command: `python -m uv run mypy src`
+- Root cause: mypy ran with Windows platform stubs, where those POSIX-only APIs are not present.
+- Fix: replaced direct POSIX-only attribute access with guarded dynamic lookups and a regular process termination fallback.
+- Regression protection: `uv run mypy src` now passes on the current Windows environment.
+
+### Diagnostics tried to run Git after the workspace disappeared
+
+- Symptom: the diagnostic missing-workspace test failed with `NotADirectoryError` from `git rev-parse`.
+- Failing command: `python -m uv run pytest tests/unit/test_process_runner.py tests/unit/test_test_runner.py tests/unit/test_git_service.py tests/unit/test_diagnostics.py tests/security/test_artifact_service.py`
+- Root cause: `GitService` attempted to run Git with a `cwd` that no longer existed.
+- Fix: `GitService` now returns non-repository status before spawning Git when the workspace path is missing or not a directory.
+- Regression protection: diagnostics tests cover the disappeared-workspace error path.

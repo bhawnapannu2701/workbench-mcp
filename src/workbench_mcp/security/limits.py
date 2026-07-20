@@ -36,3 +36,29 @@ def utf8_size(value: str) -> int:
     """Return UTF-8 encoded size for output-limit accounting."""
 
     return len(value.encode("utf-8"))
+
+
+def truncate_text(value: str, max_bytes: int) -> tuple[str, bool]:
+    """Truncate text to a UTF-8 byte budget without splitting code points."""
+
+    encoded = value.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return value, False
+
+    truncated = encoded[:max_bytes].decode("utf-8", errors="ignore")
+    return truncated, True
+
+
+def truncate_output_pair(
+    stdout: str,
+    stderr: str,
+    max_total_bytes: int,
+) -> tuple[str, str, bool, bool]:
+    """Apply one total output budget across stdout first, then stderr."""
+
+    stdout_limited, stdout_truncated = truncate_text(stdout, max_total_bytes)
+    remaining_bytes = max(max_total_bytes - utf8_size(stdout_limited), 0)
+    stderr_limited, stderr_truncated = truncate_text(stderr, remaining_bytes)
+    if stderr and remaining_bytes == 0:
+        stderr_truncated = True
+    return stdout_limited, stderr_limited, stdout_truncated, stderr_truncated

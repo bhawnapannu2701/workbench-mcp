@@ -9,6 +9,10 @@ class ConfigError(WorkbenchMcpError):
     """Raised when configuration cannot be loaded or validated safely."""
 
 
+class SecurityError(WorkbenchMcpError):
+    """Raised when an operation violates a configured security boundary."""
+
+
 class WorkspaceFileError(WorkbenchMcpError):
     """Raised when a workspace file operation cannot be completed safely."""
 
@@ -51,3 +55,19 @@ class ReadOnlyModeError(WorkspaceFileError):
 
 class PatchPreconditionError(WorkspaceFileError):
     """Raised when a patch expected-content precondition is not met."""
+
+
+class CommandSecurityError(SecurityError):
+    """Raised when a process command is not approved for execution."""
+
+
+class ArtifactAccessError(SecurityError):
+    """Raised when artifact collection is not approved."""
+
+
+class ProcessExecutionError(WorkbenchMcpError):
+    """Raised when a subprocess cannot be started or managed."""
+
+
+class GitServiceError(WorkbenchMcpError):
+    """Raised when read-only Git inspection fails unexpectedly."""
