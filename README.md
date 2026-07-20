@@ -8,10 +8,10 @@ This is a public portfolio/open-source project. It is not a private platform int
 ## Current Scope
 
 The current implementation exposes the real FastMCP server surface over the secure service
-layer and has completed Phase 5 testing, security review, coverage measurement, package
-build, and stdio MCP smoke verification. Only stdio transport is implemented and verified.
-Streamable HTTP is supported by the installed FastMCP package, but it is not enabled in this
-project yet.
+layer and has completed local Phase 6 testing, security review, coverage measurement,
+package build, stdio MCP smoke verification, Docker packaging, container smoke testing, and
+Docker Compose smoke testing. Only stdio transport is implemented and verified. Streamable
+HTTP is supported by the installed FastMCP package, but it is not enabled in this project yet.
 
 ## MCP Surface
 
@@ -74,10 +74,57 @@ Latest measured results:
 - Package build: `dist\workbench_mcp-0.1.0.tar.gz` and
   `dist\workbench_mcp-0.1.0-py3-none-any.whl`
 
+## Docker Quick Start
+
+The container defaults to stdio transport, read-only workspace mode, a non-root runtime user,
+and no published HTTP port.
+
+```powershell
+docker build -t workbench-mcp:local .
+docker run --rm --entrypoint python workbench-mcp:local -c "import os; print(os.geteuid())"
+& $env:APPDATA\Python\Python313\Scripts\uv.exe run python scripts\run-container-smoke.py --image workbench-mcp:local
+```
+
+To run the Compose smoke workflow:
+
+```powershell
+New-Item -ItemType Directory -Force .workbench-demo\workspace, .workbench-demo\artifacts | Out-Null
+Set-Content -LiteralPath .workbench-demo\workspace\smoke.txt -Value "hello compose"
+docker compose config
+docker compose run --rm --build workbench-mcp-smoke
+```
+
+Compose mounts `.workbench-demo/workspace` read-only at `/workspace` and
+`.workbench-demo/artifacts` read-write at `/artifacts`. It runs without a published port,
+without host networking, without the Docker socket, with all Linux capabilities dropped, and
+with `no-new-privileges:true`.
+
+On Linux hosts, ensure the artifact mount is writable by UID/GID `10001` or mode-compatible
+with that user. On Docker Desktop for Windows, bind-mount permission behavior is mediated by
+Docker Desktop; the Phase 6 smoke workflow verifies the artifact directory can be written by
+the container before reporting success.
+
+Verified local Phase 6 container results:
+
+- Docker build: succeeded for `workbench-mcp:local`
+- Runtime user: `10001:10001`
+- Container smoke: status `ok`
+- Compose config: passed
+- Compose smoke workflow: status `ok`
+
+## CI
+
+`.github/workflows/ci.yml` is configured for `pull_request` and pushes to `main` or
+`codex/**`. It installs locked dependencies with uv, runs Ruff format/lint, mypy, the full
+pytest suite with coverage, explicit Linux symlink security tests, package build, stdio MCP
+smoke tests, Docker image build, container smoke tests, and Compose validation. Remote
+GitHub Actions execution has not been verified yet.
+
 ## Known Limitations
 
 - HTTP transport is not implemented or verified yet.
-- Docker, CI, and demo automation are planned for later phases and should not be treated as
-  complete.
+- Remote GitHub Actions status is not verified until the workflow is pushed and run on
+  GitHub.
+- Reproducible demo automation remains for a later phase.
 - Some symlink escape tests are skipped on this Windows machine when symlink creation fails
   with `WinError 1314`; they remain active for environments where symlinks are permitted.

@@ -213,6 +213,7 @@ tempCodeRunnerFile.py
 artifacts/*
 !artifacts/.gitkeep
 .workbench-artifacts/
+.workbench-demo/
 
 # Marimo
 marimo/_static/

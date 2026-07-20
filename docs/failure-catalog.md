@@ -139,3 +139,63 @@ This file records real implementation failures encountered while building the pr
 - Root cause: Phase 3 tests covered Git status behavior and diagnostic severities, but did not explicitly lock down these two narrower expectations.
 - Fix: added `test_git_status_uses_only_read_only_git_commands` and `test_diagnostics_reports_warning_when_artifact_directory_is_not_writable`.
 - Regression protection: the full pytest suite now includes those cases.
+
+## Phase 6
+
+### Response stream disconnected after partial Docker and CI edits
+
+- Symptom: Phase 6 repository files were modified, but the prior response ended before
+  verification and commit.
+- Failing command: N/A; the assistant response stream disconnected.
+- Root cause: external stream interruption during the implementation turn.
+- Fix: resumed by inspecting `git branch --show-current`, `git status --short`,
+  `git diff --stat`, `git log --oneline -7`, and `git stash list`; inspected existing
+  Docker, Compose, smoke-test, and CI files before editing; preserved the partial Phase 6
+  work; did not apply, drop, or delete stashes.
+- Regression protection: Phase 6 final verification reruns the full Python, Docker,
+  container, and Compose checks before committing.
+
+### Docker engine was initially unavailable
+
+- Symptom: Docker CLI was installed, but `docker info` could not connect to the Linux
+  engine pipe.
+- Failing command: `docker info`
+- Root cause: Docker Desktop's Linux engine was not running when Phase 6 verification began.
+- Fix: started Docker Desktop and reran `docker info` successfully against the
+  `desktop-linux` context.
+- Regression protection: Docker availability checks now precede Docker build and container
+  smoke commands in the Phase 6 workflow.
+
+### Container smoke helper had an invalid f-string during initial validation
+
+- Symptom: the smoke helper failed Python compilation before it could run Docker.
+- Failing command: `uv run python -m py_compile scripts\container-smoke-test.py scripts\run-container-smoke.py`
+- Root cause: the first host-side smoke command assembled a nested JSON environment value
+  inside an f-string with conflicting quote characters.
+- Fix: built the `TEST_COMMANDS` value with `json.dumps` before constructing the Docker
+  argument array.
+- Regression protection: `uv run python -m py_compile` and Ruff checks were run after the
+  fix, and the final container smoke test exercises the helper end to end.
+
+### Ruff flagged the Docker tmpfs mount string as a hardcoded temp path
+
+- Symptom: Ruff reported `S108` for the literal Docker tmpfs target string.
+- Failing command: `uv run ruff check .`
+- Root cause: the security lint rule treats `/tmp` literals as suspicious even when the
+  string is a Docker runtime mount specification.
+- Fix: kept the explicit tmpfs mount and added a line-specific `# noqa: S108` on that
+  argument.
+- Regression protection: `uv run ruff check .` is part of Phase 6 and CI verification.
+
+### Local command guard blocked recursive smoke-directory cleanup
+
+- Symptom: cleanup of `.workbench-demo` was rejected by the local command-safety guard even
+  after resolving the path inside the repository.
+- Failing commands: `Remove-Item -LiteralPath .workbench-demo -Recurse -Force` and an
+  explicit absolute-path variant.
+- Root cause: the local execution guard rejected recursive deletion commands in this
+  environment.
+- Fix: did not switch to a riskier deletion path. `.workbench-demo` remains ignored by Git
+  and excluded from Docker build context.
+- Regression protection: `.gitignore` and `.dockerignore` exclude `.workbench-demo`, and
+  final Git status ignores it.

@@ -42,7 +42,7 @@ scripts/
 artifacts/
 ```
 
-Phase 1 established the package metadata, repository rules, validated configuration layer, and configuration tests. Phases 2 and 3 added the secure service layer. Phase 4 added FastMCP tool/resource registration and stdio startup. Later phases will add broader validation, Docker, CI, documentation hardening, and demo automation.
+Phase 1 established the package metadata, repository rules, validated configuration layer, and configuration tests. Phases 2 and 3 added the secure service layer. Phase 4 added FastMCP tool/resource registration and stdio startup. Phase 5 completed broad security and integration validation. Phase 6 adds Docker packaging and CI configuration. Later phases will add demo automation, documentation hardening, and final review.
 
 ## Security Boundaries
 
@@ -84,8 +84,12 @@ Phase 1 established the package metadata, repository rules, validated configurat
   verification completed. The full suite reported 83 passed and 4 Windows symlink skips.
   Coverage was measured at combined 83%, with 1074/1254 statements and 200/274 branches
   covered. `uv build` produced the source distribution and wheel.
-- Later phases must not assume Docker, CI, demo automation, or final documentation hardening
-  are complete until those phases verify them.
+- Phase 6: Docker packaging, Docker Compose smoke workflow, container smoke testing, and
+  GitHub Actions CI configuration implemented. Local Docker verification is recorded in
+  `PROJECT_EVIDENCE.md`. Remote GitHub Actions execution is not verified until the branch is
+  pushed and the workflow runs on GitHub.
+- Later phases must not assume demo automation or final documentation hardening are complete
+  until those phases verify them.
 
 ## Testing Strategy
 
@@ -100,13 +104,20 @@ Phase 1 established the package metadata, repository rules, validated configurat
 
 ## Docker Strategy
 
-- Use a pinned minimal Python base image where possible.
-- Install dependencies deterministically from `uv.lock`.
-- Run as a non-root user.
-- Avoid privileged mode and Docker socket mounts.
-- Document workspace and artifact volume mounts.
-- Keep runtime compatible with a read-only root filesystem where practical.
-- Add a health check only if Streamable HTTP transport is implemented and verified.
+- Use `python:3.13.3-slim-bookworm` pinned by digest for the current Python-compatible
+  runtime image.
+- Install runtime dependencies deterministically with `uv==0.11.29` and `uv sync --frozen
+  --no-dev --no-editable`.
+- Build in a separate stage and copy the prepared virtual environment into the runtime
+  stage.
+- Run as non-root UID/GID `10001:10001`.
+- Keep stdio as the container entry point and do not publish HTTP ports because HTTP is not
+  implemented by this project.
+- Avoid privileged mode, host networking, and Docker socket mounts.
+- Use explicit `/workspace` and `/artifacts` mounts; Compose mounts the workspace read-only
+  by default and the artifact directory read-write.
+- Support read-only root filesystem execution with tmpfs-backed `/tmp` for smoke workflows.
+- Do not add a health check while there is no persistent HTTP service.
 
 ## Technical Risks
 
@@ -121,14 +132,18 @@ Phase 1 established the package metadata, repository rules, validated configurat
 These commands are expected to be run before completion, adjusting only where later implementation proves a command unsupported:
 
 ```powershell
-python -m uv sync --all-groups
-python -m uv run ruff format --check .
-python -m uv run ruff check .
-python -m uv run mypy src tests
-python -m uv run pytest --cov=workbench_mcp --cov-report=term-missing
-python -m uv run python -m build
+& $env:APPDATA\Python\Python313\Scripts\uv.exe sync --frozen --all-groups
+& $env:APPDATA\Python\Python313\Scripts\uv.exe run ruff format --check .
+& $env:APPDATA\Python\Python313\Scripts\uv.exe run ruff check .
+& $env:APPDATA\Python\Python313\Scripts\uv.exe run mypy src
+& $env:APPDATA\Python\Python313\Scripts\uv.exe run pytest -rs
+& $env:APPDATA\Python\Python313\Scripts\uv.exe run pytest --cov=workbench_mcp --cov-report=term-missing
+& $env:APPDATA\Python\Python313\Scripts\uv.exe build
+& $env:APPDATA\Python\Python313\Scripts\uv.exe run pytest tests\e2e\test_mcp_stdio.py
 docker build -t workbench-mcp:local .
-docker run --rm workbench-mcp:local --help
-python -m uv run python scripts/demo.py
+docker image inspect workbench-mcp:local
+& $env:APPDATA\Python\Python313\Scripts\uv.exe run python scripts\run-container-smoke.py --image workbench-mcp:local
+docker compose config
+docker compose run --rm --build workbench-mcp-smoke
 git status --short
 ```
