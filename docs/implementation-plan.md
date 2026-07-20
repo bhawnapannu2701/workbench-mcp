@@ -80,8 +80,12 @@ Phase 1 established the package metadata, repository rules, validated configurat
   transport, and has in-memory and stdio MCP client tests. Streamable HTTP is supported by
   FastMCP but remains unimplemented in this project because no validated HTTP configuration
   or port-binding policy exists yet.
-- Later phases must not assume Docker, CI, demo automation, package builds, or coverage
-  reporting are complete until those phases verify them.
+- Phase 5: full test, security-search, coverage, package-build, and MCP stdio smoke
+  verification completed. The full suite reported 83 passed and 4 Windows symlink skips.
+  Coverage was measured at combined 83%, with 1074/1254 statements and 200/274 branches
+  covered. `uv build` produced the source distribution and wheel.
+- Later phases must not assume Docker, CI, demo automation, or final documentation hardening
+  are complete until those phases verify them.
 
 ## Testing Strategy
 
@@ -90,6 +94,8 @@ Phase 1 established the package metadata, repository rules, validated configurat
 - Security tests will cover traversal, symlink escape, oversized files, binary rejection, blocked executables, shell operators, truncation, timeout, and secret redaction.
 - End-to-end tests will start the MCP server and exercise at least one real client/server interaction.
 - Phase 4 added a real stdio FastMCP client/server E2E test using `StdioTransport`.
+- Phase 5 added explicit audit coverage for read-only Git subcommands and artifact-directory
+  permission-style diagnostic findings.
 - Tests must use temporary directories and must not modify unrelated developer files.
 
 ## Docker Strategy

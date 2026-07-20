@@ -121,3 +121,21 @@ This file records real implementation failures encountered while building the pr
 - Root cause: new server/tool/test files were edited manually before formatter and import sorting were applied.
 - Fix: moved the package version import to module scope, updated `call_safely` to Python 3.12 type-parameter syntax, ran `uv run ruff format .`, and ran `uv run ruff check . --fix`.
 - Regression protection: Phase 4 verification reran Ruff format check and lint successfully.
+
+## Phase 5
+
+### PowerShell rejected a multi-path `Get-ChildItem` inventory command
+
+- Symptom: the repository inventory command failed with `A positional parameter cannot be found that accepts argument 'docs'`.
+- Failing command: `Get-ChildItem -Recurse -File docs src tests scripts | Select-Object -ExpandProperty FullName`
+- Root cause: the PowerShell invocation did not accept the path list with that parameter set.
+- Fix: used `rg --files docs src tests scripts` for repository file inventory.
+- Regression protection: future audits should prefer `rg --files` for file discovery.
+
+### Requirement audit found missing explicit Git and diagnostic test coverage
+
+- Symptom: Phase 5 audit found no dedicated test proving Git status uses only read-only subcommands, and no diagnostic test for artifact-directory write warnings.
+- Failing command: N/A; this was a checklist gap found during manual audit.
+- Root cause: Phase 3 tests covered Git status behavior and diagnostic severities, but did not explicitly lock down these two narrower expectations.
+- Fix: added `test_git_status_uses_only_read_only_git_commands` and `test_diagnostics_reports_warning_when_artifact_directory_is_not_writable`.
+- Regression protection: the full pytest suite now includes those cases.
