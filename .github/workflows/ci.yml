@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "codex/**"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify package, security tests, and containers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.3"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.29"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install locked dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Verify lockfile consistency
+        run: uv lock --check
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: mypy
+        run: uv run mypy src
+
+      - name: Run tests with coverage
+        run: |
+          mkdir -p artifacts/test-reports artifacts/coverage
+          uv run pytest \
+            --junitxml=artifacts/test-reports/pytest.xml \
+            --cov=workbench_mcp \
+            --cov-report=term-missing \
+            --cov-report=xml:artifacts/coverage/coverage.xml \
+            --cov-report=html:artifacts/coverage/html
+
+      - name: Run symlink security tests explicitly on Linux
+        run: |
+          uv run pytest \
+            tests/security/test_artifact_service.py::test_rejects_artifact_symlink_escape \
+            tests/security/test_patching_security.py::test_apply_patch_rejects_symlink_escape \
+            tests/security/test_path_security.py::test_read_file_rejects_symlink_escape \
+            tests/security/test_path_security.py::test_list_files_rejects_symlink_directory_escape
+
+      - name: Build package
+        run: uv build
+
+      - name: MCP stdio smoke test
+        run: uv run pytest tests/e2e/test_mcp_stdio.py
+
+      - name: Build Docker image
+        run: docker build -t workbench-mcp:ci .
+
+      - name: Run container smoke test
+        run: uv run python scripts/run-container-smoke.py --image workbench-mcp:ci
+
+      - name: Prepare Compose smoke mounts
+        run: |
+          mkdir -p .workbench-demo/workspace .workbench-demo/artifacts
+          printf 'hello compose\n' > .workbench-demo/workspace/smoke.txt
+          chmod -R u+rwX,go-rwx .workbench-demo
+          echo "WORKBENCH_MCP_CONTAINER_USER=$(id -u):$(id -g)" >> "$GITHUB_ENV"
+
+      - name: Validate Compose configuration
+        env:
+          WORKBENCH_MCP_IMAGE: workbench-mcp:ci
+        run: docker compose config
+
+      - name: Run Compose smoke workflow
+        env:
+          WORKBENCH_MCP_IMAGE: workbench-mcp:ci
+        run: docker compose run --rm --build workbench-mcp-smoke
+
+      - name: Upload test and coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-and-coverage-artifacts
+          path: |
+            artifacts/test-reports
+            artifacts/coverage
+          if-no-files-found: ignore

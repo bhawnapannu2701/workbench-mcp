@@ -1,0 +1,42 @@
+name: workbench-mcp
+
+services:
+  workbench-mcp-smoke:
+    image: ${WORKBENCH_MCP_IMAGE:-workbench-mcp:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.13.3"
+        DEBIAN_VARIANT: bookworm
+        PYTHON_BASE_DIGEST: "sha256:56a11364ffe0fee3bd60af6d6d5209eba8a99c2c16dc4c7c5861dc06261503cc"
+        UV_VERSION: "0.11.29"
+    user: "${WORKBENCH_MCP_CONTAINER_USER:-10001:10001}"
+    entrypoint: ["python", "/app/scripts/container-smoke-test.py"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    network_mode: none
+    environment:
+      WORKSPACE_ROOT: /workspace
+      ARTIFACT_DIRECTORY: /artifacts
+      READ_ONLY_MODE: "true"
+      MAX_FILE_SIZE_BYTES: "1048576"
+      MAX_COMMAND_SECONDS: "10"
+      MAX_OUTPUT_BYTES: "1048576"
+      ALLOWED_COMMANDS: python
+      TEST_COMMANDS: '[{"name":"smoke","command":["python","-c","print(\"ok\")"]}]'
+      LOG_LEVEL: ERROR
+      SMOKE_WORKSPACE_FILE: smoke.txt
+    volumes:
+      - type: bind
+        source: ${WORKBENCH_MCP_WORKSPACE:-./.workbench-demo/workspace}
+        target: /workspace
+        read_only: true
+      - type: bind
+        source: ${WORKBENCH_MCP_ARTIFACTS:-./.workbench-demo/artifacts}
+        target: /artifacts
