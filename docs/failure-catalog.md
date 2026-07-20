@@ -35,3 +35,29 @@ This file records real implementation failures encountered while building the pr
 - Root cause: `WorkbenchConfig` assigned to `artifact_directory` inside an `after` model validator while assignment validation was enabled, which re-entered the validator.
 - Fix: updated the validator to set the resolved artifact directory with `object.__setattr__`.
 - Regression protection: unit tests cover valid environment, TOML, override, and sanitized-summary loading paths.
+
+## Phase 2
+
+### PowerShell rejected an unquoted stash reference
+
+- Symptom: applying the saved Phase 2 work failed with `error: unknown switch 'e'`.
+- Failing command: `git stash apply stash@{1}`
+- Root cause: PowerShell interpreted the unquoted brace expression instead of passing it as a literal Git revision.
+- Fix: reran the command as `git stash apply 'stash@{1}'`.
+- Regression protection: future stash references in PowerShell should be quoted.
+
+### Ruff import-order check failed on new tests
+
+- Symptom: Ruff reported unsorted import blocks in the new filesystem, search, patching, and security tests.
+- Failing command: `python -m uv run ruff check .`
+- Root cause: initial test imports were manually ordered and did not match Ruff's configured import sorter.
+- Fix: ran `python -m uv run ruff check . --fix` to sort imports.
+- Regression protection: `python -m uv run ruff check .` is part of phase verification.
+
+### Filesystem and patch tests failed on Windows newline translation
+
+- Symptom: exact-content read and patch tests expected `\n`, while service reads preserved `\r\n` bytes written by text-mode defaults on Windows.
+- Failing command: `python -m uv run pytest tests/unit/test_filesystem_services.py tests/unit/test_search_service.py tests/unit/test_patching_service.py tests/security/test_path_security.py tests/security/test_patching_security.py`
+- Root cause: the tests used `Path.write_text()` without an explicit newline policy for files whose exact bytes were asserted or patched.
+- Fix: updated exact-content test fixtures to write with `newline="\n"`.
+- Regression protection: Phase 2 tests now assert exact reads and patch preconditions using platform-stable fixture files.

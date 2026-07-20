@@ -56,7 +56,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"]
+"tests/**/*.py" = ["PLR2004", "S101"]
 
 [tool.ruff.format]
 line-ending = "lf"
@@ -71,6 +71,7 @@ mypy_path = ["src"]
 [tool.pytest.ini_options]
 minversion = "9.0"
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = [
   "--strict-config",
   "--strict-markers",
